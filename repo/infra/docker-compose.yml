@@ -1,0 +1,54 @@
+# LeadsCaps — pilha da VPS
+# subir:  docker compose --env-file ../.env up -d
+# logs:   docker compose logs -f api
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../db:/docker-entrypoint-initdb.d:ro   # roda 001_schema.sql no primeiro boot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # sem portas publicadas: o banco só existe na rede interna do compose
+
+  api:
+    build: ../api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      ORIGENS_PERMITIDAS: ${ORIGENS_PERMITIDAS}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      APOLLO_API_KEY: ${APOLLO_API_KEY}
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO_API: ${DOMINIO_API}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  caddydata:
+  caddyconfig:

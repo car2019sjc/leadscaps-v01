@@ -1,0 +1,15 @@
+# TLS automático via Let's Encrypt. O domínio precisa apontar para o IP
+# da VPS ANTES de subir, senão a emissão do certificado falha.
+{$DOMINIO_API} {
+	encode gzip
+	reverse_proxy api:3000
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "DENY"
+		Referrer-Policy           "no-referrer"
+	}
+	log {
+		output file /data/acesso.log
+	}
+}
